@@ -106,16 +106,23 @@ router.get('/alumni/applications', auth, async (req, res) => {
             return res.status(403).json({ message: 'Only alumni can view applications' });
         }
 
+        console.log('User requesting applications:', req.user);
+
         // Find all opportunities posted by this alumni
-        const opportunities = await FreelanceOpportunity.find({ postedBy: req.user._id });
+        const opportunities = await FreelanceOpportunity.find({ postedBy: req.user.userId });
         const opportunityIds = opportunities.map(opportunity => opportunity._id);
 
-        // Find all applications for these opportunities
-        const applications = await FreelanceApplication.find({ opportunityId: { $in: opportunityIds } })
+        console.log('Found opportunities:', opportunityIds);
+
+        // Find all applications for these opportunities (not just pending ones)
+        const applications = await FreelanceApplication.find({ 
+            opportunityId: { $in: opportunityIds }
+        })
             .populate('opportunityId', 'projectTitle category')
             .populate('studentId', 'name email profile')
             .sort({ appliedAt: -1 });
 
+        console.log(`Found ${applications.length} applications for alumni ${req.user.userId}`);
         res.json(applications);
     } catch (error) {
         console.error('Error fetching alumni applications:', error);
@@ -167,26 +174,45 @@ router.put('/:applicationId/status', auth, async (req, res) => {
 router.put('/update-status', auth, async (req, res) => {
     try {
         const { opportunityId, studentId, status } = req.body;
+        
+        console.log('Received status update request:', { opportunityId, studentId, status });
 
         // Validate status
         if (!['accepted', 'rejected', 'pending'].includes(status)) {
             return res.status(400).json({ message: 'Invalid status' });
         }
+        
+        // Check if the user is an alumni
+        if (req.user.role !== 'alumni') {
+            return res.status(403).json({ message: 'Only alumni can update application status' });
+        }
+        
+        // Find the opportunity to verify ownership
+        const opportunity = await FreelanceOpportunity.findById(opportunityId);
+        if (!opportunity) {
+            return res.status(404).json({ message: 'Opportunity not found' });
+        }
+        
+        // Verify the alumni owns this opportunity
+        if (opportunity.postedBy.toString() !== req.user.userId) {
+            return res.status(403).json({ message: 'Not authorized to update applications for this opportunity' });
+        }
 
-        // Find and update the application
+        // Find and update the application without the pending status constraint
         const application = await FreelanceApplication.findOneAndUpdate(
             { 
                 opportunityId,
-                studentId,
-                status: 'pending' // Only allow updating pending applications
+                studentId
             },
             { status },
             { new: true }
         ).populate('opportunityId', 'projectTitle');
 
         if (!application) {
-            return res.status(404).json({ message: 'Application not found or cannot be updated' });
+            return res.status(404).json({ message: 'Application not found' });
         }
+        
+        console.log('Updated application:', application);
 
         // Create notification for the student
         const notification = new Notification({
@@ -202,7 +228,10 @@ router.put('/update-status', auth, async (req, res) => {
         res.json(application);
     } catch (error) {
         console.error('Error updating application status:', error);
-        res.status(500).json({ message: 'Error updating application status' });
+        res.status(500).json({ 
+            message: 'Error updating application status',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 });
 

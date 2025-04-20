@@ -16,6 +16,18 @@ const theme = createTheme({
       secondary: 'rgba(255, 255, 255, 0.7)',
     },
     divider: 'rgba(255, 255, 255, 0.12)',
+    success: {
+      main: '#4caf50',
+      dark: '#388e3c',
+      light: '#81c784',
+      lightest: '#e8f5e9',
+    },
+    error: {
+      main: '#f44336',
+      dark: '#d32f2f',
+      light: '#e57373',
+      lightest: '#ffebee',
+    },
   },
   typography: {
     fontFamily: '"Inter", "Poppins", "DM Sans", sans-serif',
