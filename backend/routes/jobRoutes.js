@@ -3,6 +3,7 @@ const router = express.Router();
 const FreelanceOpportunity = require('../models/Job');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const FreelanceApplication = require('../models/JobApplication');
 
 // Test route to verify database connection
 router.get('/test', async (req, res) => {
